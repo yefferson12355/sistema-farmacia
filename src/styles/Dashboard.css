@@ -1,0 +1,386 @@
+/* ===== DASHBOARD CONTAINER ===== */
+.dashboard-container {
+  background-color: #f5f5f5;
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
+}
+
+/* ===== MAIN CONTENT ===== */
+.dashboard-main {
+  padding: 24px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* ===== HEADER ===== */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  font-size: 32px;
+  color: #333;
+  font-weight: 700;
+}
+
+.dashboard-header p {
+  margin: 6px 0 0 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.btn-logout {
+  background: #ff4d4d;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+  background: #ff3333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 77, 77, 0.3);
+}
+
+/* ===== CARDS ===== */
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.card h2,
+.card h3,
+.card h4 {
+  margin: 0 0 16px 0;
+  color: #333;
+}
+
+.card h2 {
+  font-size: 20px;
+}
+
+.card h3 {
+  font-size: 18px;
+}
+
+.card h4 {
+  font-size: 16px;
+}
+
+/* ===== GRID LAYOUT ===== */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ===== KPIs ===== */
+.kpis-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.kpi-box {
+  padding: 16px;
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-left: 4px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.kpi-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.kpi-blue {
+  background: linear-gradient(135deg, rgba(25, 118, 210, 0.1) 0%, rgba(25, 118, 210, 0.05) 100%);
+  border-left-color: #1976d2;
+}
+
+.kpi-red {
+  background: linear-gradient(135deg, rgba(255, 77, 77, 0.1) 0%, rgba(255, 77, 77, 0.05) 100%);
+  border-left-color: #ff4d4d;
+}
+
+.kpi-yellow {
+  background: linear-gradient(135deg, rgba(255, 202, 40, 0.1) 0%, rgba(255, 202, 40, 0.05) 100%);
+  border-left-color: #ffb300;
+}
+
+.kpi-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.kpi-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+  line-height: 1.3;
+}
+
+.kpi-label {
+  color: #666;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.kpi-red .kpi-value {
+  color: #ff4d4d;
+}
+
+.kpi-yellow .kpi-value {
+  color: #ffb300;
+}
+
+/* ===== ACTIVITY ===== */
+.activity-card {
+  margin-top: 0;
+}
+
+.activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.activity-list li {
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  color: #666;
+  font-size: 14px;
+}
+
+.activity-list li:last-child {
+  border-bottom: none;
+}
+
+.activity-list small {
+  color: #999;
+  font-size: 12px;
+}
+
+/* ===== ACTIONS ===== */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.action-btn {
+  padding: 12px 14px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+.btn-blue {
+  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+  color: white;
+}
+
+.btn-green {
+  background: linear-gradient(135deg, #2e7d32 0%, #256b2c 100%);
+  color: white;
+}
+
+.btn-orange {
+  background: linear-gradient(135deg, #ff8a65 0%, #ff6e40 100%);
+  color: white;
+}
+
+.btn-yellow {
+  background: linear-gradient(135deg, #f9a825 0%, #f59c00 100%);
+  color: #333;
+}
+
+.btn-purple {
+  background: linear-gradient(135deg, #6a1b9a 0%, #5e0d7b 100%);
+  color: white;
+}
+
+.btn-gray {
+  background: linear-gradient(135deg, #616161 0%, #4a4a4a 100%);
+  color: white;
+}
+
+.btn-cyan {
+  background: linear-gradient(135deg, #0097a7 0%, #00838f 100%);
+  color: white;
+}
+
+/* ===== SUPPORT CARD ===== */
+.support-card p {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.btn-support {
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  width: 100%;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.btn-support:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    grid-column: 1;
+  }
+
+  .kpis-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-main {
+    padding: 16px;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 24px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .kpis-container {
+    grid-template-columns: 1fr;
+  }
+
+  .action-btn {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-main {
+    padding: 12px;
+  }
+
+  .dashboard-header {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 20px;
+  }
+
+  .dashboard-header p {
+    font-size: 12px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  .card h2,
+  .card h3 {
+    font-size: 16px;
+  }
+
+  .kpis-container {
+    gap: 8px;
+  }
+
+  .kpi-box {
+    padding: 12px;
+  }
+
+  .kpi-icon {
+    font-size: 24px;
+  }
+
+  .kpi-value {
+    font-size: 16px;
+  }
+
+  .kpi-label {
+    font-size: 11px;
+  }
+
+  .action-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}
