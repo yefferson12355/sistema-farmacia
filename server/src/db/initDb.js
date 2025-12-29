@@ -8,22 +8,36 @@ async function runSQL(file) {
 }
 
 async function initDb() {
-  const res = await pool.query(`
-    SELECT to_regclass('public.medicamentos') AS exists;
-  `);
+  try {
+    const res = await pool.query("SELECT NOW()");
+    console.log("🔌 Conectado a DB:", res.rows[0].now);
 
-  if (res.rows[0].exists) {
-    console.log("📦 Base de datos ya inicializada");
-    return;
+    // 1. REINICIO DE TABLAS (Schema)
+    console.log("🛠  REINICIANDO ESTRUCTURA (Schema)...");
+    await runSQL(path.join(__dirname, "../../migraciones/schema.sql"));
+    console.log("✅ Tablas creadas correctamente.");
+
+    // 2. CARGA DE DATOS (Seed)
+    console.log("🌱 INSERTANDO DATOS DE PRUEBA (Seed)...");
+    await runSQL(path.join(__dirname, "../../migraciones/seed.sql"));
+    console.log("✅ Datos insertados.");
+
+    // 3. 🚨 FIX CRÍTICO DE SECUENCIAS 🚨
+    // Esto repara el error de "llave duplicada" obligando al contador a saltar al último ID
+    console.log("🔄 SINCRONIZANDO CONTADORES DE ID...");
+    await pool.query(`
+      SELECT setval(pg_get_serial_sequence('usuarios', 'id'), COALESCE(MAX(id), 1)) FROM usuarios;
+      SELECT setval(pg_get_serial_sequence('medicamentos', 'id'), COALESCE(MAX(id), 1)) FROM medicamentos;
+      SELECT setval(pg_get_serial_sequence('lotes', 'id'), COALESCE(MAX(id), 1)) FROM lotes;
+      SELECT setval(pg_get_serial_sequence('ventas', 'id'), COALESCE(MAX(id), 1)) FROM ventas;
+      SELECT setval(pg_get_serial_sequence('venta_detalle', 'id'), COALESCE(MAX(id), 1)) FROM venta_detalle;
+      SELECT setval(pg_get_serial_sequence('alertas', 'id'), COALESCE(MAX(id), 1)) FROM alertas;
+    `);
+    console.log("✅ Contadores arreglados. Listo para vender.");
+
+  } catch (error) {
+    console.error("❌ Error fatal en initDb:", error);
   }
-
-  console.log("🛠 Inicializando base de datos...");
-
-  await runSQL(path.join(__dirname, "../../migraciones/schema.sql"));
-  console.log("✅ Schema creado");
-
-  await runSQL(path.join(__dirname, "../../migraciones/seed.sql"));
-  console.log("🌱 Seed insertado");
 }
 
 module.exports = initDb;

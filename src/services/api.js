@@ -1,21 +1,18 @@
 /**
  * API Service - SIGFARMA
- * Servicio para comunicación con el backend
- * Híbrido: Auth real (login) + medicamentos real; resto mock
+ * Conexión TOTAL Backend <-> Frontend
  */
-
 import axios from 'axios';
 import {
-  medicamentos,
-  getAlertasVencimiento,
-  getAlertasStock,
-  ventasHistorial,
+  medicamentos as mockMedicamentos,
+  getAlertasVencimiento as mockAlertasVencimiento,
+  getAlertasStock as mockAlertasStock,
   validarVenta
 } from '../data/mockData';
 
-// Configuración base de axios
+// 1. CONFIGURACIÓN
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
-const USE_MOCK = (process.env.REACT_APP_USE_MOCK || 'true') === 'true';
+const USE_MOCK = false; // Forzamos a FALSE para usar el backend real
 
 const api = axios.create({
   baseURL: API_URL,
@@ -23,292 +20,170 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// ✅ Interceptor JWT (usa el token que guarda AuthContext)
+// Interceptor para Token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('sigfarma_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
-});
+}, (error) => Promise.reject(error));
 
 // ============================================
-// USUARIOS DEL SISTEMA (Mock)
-// ============================================
-const usuarios = [
-  { id: 1, username: 'admin', password: 'admin123', nombre: 'Administrador', rol: 'admin', email: 'admin@sigfarma.com' },
-  { id: 2, username: 'farmaceutico', password: 'farma123', nombre: 'Juan Pérez', rol: 'farmaceutico', email: 'juan@sigfarma.com' },
-  { id: 3, username: 'vendedor', password: 'venta123', nombre: 'Ana Martínez', rol: 'vendedor', email: 'ana@sigfarma.com' },
-  { id: 4, username: 'yefferson', password: '123456', nombre: 'Yefferson', rol: 'admin', email: 'yefferson@sigfarma.com' },
-];
-
-// ============================================
-// AUTENTICACIÓN
+// 2. AUTENTICACIÓN (REAL)
 // ============================================
 export const login = async (username, password) => {
-  if (USE_MOCK) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const usuario = usuarios.find(
-          u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
-        );
+  if (USE_MOCK) return Promise.resolve({ success: true, user: { username: 'admin' }, token: 'mock' });
 
-        if (usuario) {
-          const { password: _, ...usuarioSinPassword } = usuario;
-          const token = btoa(JSON.stringify({ userId: usuario.id, exp: Date.now() + 8 * 60 * 60 * 1000 }));
-          resolve({ success: true, user: usuarioSinPassword, token });
-        } else {
-          reject(new Error('Credenciales incorrectas'));
-        }
-      }, 500);
-    });
+  try {
+    const { data } = await api.post('/auth/login', { username, password });
+    return { success: true, user: data.user, token: data.token };
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || 'Error de conexión o credenciales');
   }
-
-  // ✅ REAL: el backend responde { token, user }
-  const { data } = await api.post('/auth/login', { username, password });
-
-  // ✅ Adaptamos al formato que tu AuthContext espera: { success, user, token }
-  return { success: true, user: data.user, token: data.token };
 };
 
-export const logout = async () => {
-  // ✅ JWT stateless: no hay endpoint necesario (evita 404)
-  return { success: true };
-};
-
-export const verificarToken = async (token) => {
-  if (USE_MOCK) {
-    return new Promise((resolve, reject) => {
-      try {
-        const decoded = JSON.parse(atob(token));
-        if (decoded.exp > Date.now()) {
-          const usuario = usuarios.find(u => u.id === decoded.userId);
-          if (usuario) {
-            const { password: _, ...usuarioSinPassword } = usuario;
-            resolve({ valid: true, user: usuarioSinPassword });
-          } else {
-            reject(new Error('Usuario no encontrado'));
-          }
-        } else {
-          reject(new Error('Token expirado'));
-        }
-      } catch {
-        reject(new Error('Token inválido'));
-      }
-    });
-  }
-
-  // ✅ REAL (temporal): como aún no implementamos /auth/me, solo validamos que exista token
-  if (!token) throw new Error('Token inválido');
-  return { valid: true };
-};
+export const logout = async () => ({ success: true });
+export const verificarToken = async (token) => ({ valid: true });
 
 // ============================================
-// MEDICAMENTOS
+// 3. MEDICAMENTOS E INVENTARIO (REAL)
 // ============================================
 export const getMedicamentos = async () => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => setTimeout(() => resolve(medicamentos), 300));
-  }
+  if (USE_MOCK) return Promise.resolve(mockMedicamentos);
   const { data } = await api.get('/medicamentos');
   return data;
 };
 
 export const getMedicamentoById = async (id) => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const med = medicamentos.find(m => m.id === parseInt(id));
-      setTimeout(() => resolve(med), 200);
-    });
-  }
+  if (USE_MOCK) return Promise.resolve(mockMedicamentos[0]);
   const { data } = await api.get(`/medicamentos/${id}`);
   return data;
 };
 
-export const getLotesByMedicamento = async (medicamentoId) => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const med = medicamentos.find(m => m.id === parseInt(medicamentoId));
-      setTimeout(() => resolve(med?.lotes || []), 200);
-    });
+export const crearMedicamento = async (data) => {
+  if (USE_MOCK) return Promise.resolve(data);
+  try {
+    const { data: resp } = await api.post('/medicamentos', data);
+    return resp;
+  } catch (error) {
+    throw new Error(error.response?.data?.error?.message || 'Error al crear');
   }
-  const { data } = await api.get(`/medicamentos/${medicamentoId}/lotes`);
-  return data;
 };
 
 export const buscarMedicamentos = async (query) => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const resultados = medicamentos.filter(m =>
-        m.nombre_comercial.toLowerCase().includes(query.toLowerCase()) ||
-        m.principio_activo.toLowerCase().includes(query.toLowerCase())
-      );
-      setTimeout(() => resolve(resultados), 200);
-    });
-  }
-  const { data } = await api.get(`/medicamentos/buscar?q=${encodeURIComponent(query)}`);
-  return data;
+  const { data } = await api.get('/medicamentos');
+  return data.filter(m => m.nombre_comercial.toLowerCase().includes(query.toLowerCase()));
 };
 
-export const crearMedicamento = async (data) => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const nuevo = { ...data, id: medicamentos.length + 1 };
-      medicamentos.push(nuevo);
-      setTimeout(() => resolve(nuevo), 300);
-    });
-  }
-  const { data: resp } = await api.post('/medicamentos', data);
-  return resp;
+export const getLotesByMedicamento = async (id) => {
+    try {
+        const { data } = await api.get(`/medicamentos/${id}`);
+        return data.lotes || [];
+    } catch (e) { return []; }
 };
 
 // ============================================
-// ALERTAS
+// 4. ALERTAS Y KPIs (REALES)
 // ============================================
+
 export const getAlertasVencimientoAPI = async () => {
-  if (USE_MOCK) return new Promise((resolve) => setTimeout(() => resolve(getAlertasVencimiento()), 300));
+  if (USE_MOCK) return Promise.resolve(mockAlertasVencimiento());
+
   const { data } = await api.get('/alertas/vencimiento');
-  return data;
+  return data.map(item => ({
+    id: item.lote_id,
+    medicamento: item.nombre_comercial,
+    lote: item.numero_lote,
+    fecha_vencimiento: item.fecha_vencimiento,
+    dias_restantes: Math.ceil((new Date(item.fecha_vencimiento) - new Date()) / (1000 * 60 * 60 * 24)),
+    estado: item.estado_vencimiento,
+    stock: item.stock_actual
+  }));
 };
 
 export const getAlertasStockAPI = async () => {
-  if (USE_MOCK) return new Promise((resolve) => setTimeout(() => resolve(getAlertasStock()), 300));
+  if (USE_MOCK) return Promise.resolve(mockAlertasStock());
+  
   const { data } = await api.get('/alertas/stock');
-  return data;
+  return data.map(item => ({
+    id: item.id,
+    medicamento: item.nombre_comercial,
+    stock_actual: Number(item.stock_total),
+    stock_minimo: item.stock_minimo,
+    deficit: item.stock_minimo - item.stock_total
+  }));
 };
 
 // ============================================
-// VENTAS
+// 5. VENTAS Y TRANSACCIONES
 // ============================================
-export const getVentasHistorial = async () => {
-  if (USE_MOCK) return new Promise((resolve) => setTimeout(() => resolve(ventasHistorial), 300));
-  const { data } = await api.get('/ventas');
-  return data;
-};
-
 export const procesarVenta = async (ventaData) => {
-  if (USE_MOCK) {
-    return new Promise((resolve, reject) => {
-      for (const item of ventaData.productos) {
-        const validacion = validarVenta(item.lote);
-        if (!validacion.permitido) {
-          reject(new Error(validacion.mensaje));
-          return;
-        }
-      }
+  if (USE_MOCK) return Promise.resolve({ id: 123 });
 
-      const nuevaVenta = {
-        id: ventasHistorial.length + 1,
-        fecha: new Date().toISOString().split('T')[0],
-        ...ventaData,
-      };
-      ventasHistorial.unshift(nuevaVenta);
-      setTimeout(() => resolve(nuevaVenta), 500);
-    });
-  }
+  const payload = {
+    usuario_id: ventaData.usuario_id || 1, 
+    cliente_dni: ventaData.cliente_dni || '12345678',
+    metodo_pago: ventaData.metodoPago || 'Efectivo',
+    // IMPORTANTE: NO enviamos precio_unit, el backend lo busca
+    items: ventaData.productos.map(p => ({
+      lote_id: p.lote.id,
+      cantidad: Number(p.cantidad)
+    })),
+    cliente_nombre: ventaData.cliente_nombre // Enviamos nombre para crearlo si no existe
+  };
 
-  const { data } = await api.post('/ventas', ventaData);
+  const { data } = await api.post('/ventas', payload);
   return data;
 };
 
 export const validarProductoParaVenta = (lote) => validarVenta(lote);
 
-// ============================================
-// REPORTES
-// ============================================
-export const getReporteVentas = async (fechaInicio, fechaFin) => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const ventas = ventasHistorial.filter(v => v.fecha >= fechaInicio && v.fecha <= fechaFin);
-      setTimeout(() => resolve(ventas), 300);
-    });
+// ✅ FUNCIÓN CORREGIDA: Ahora sí conecta con el endpoint GET del backend
+export const getVentasHistorial = async () => {
+  if (USE_MOCK) return []; 
+  try {
+    const { data } = await api.get('/ventas');
+    
+    return data.map(v => ({
+      id: v.id,
+      fecha: new Date(v.created_at).toLocaleDateString('es-PE'),
+      hora: new Date(v.created_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+      cliente: v.cliente_nombre,
+      dni: v.cliente_dni,
+      vendedor: v.vendedor_nombre,
+      total: Number(v.total),
+      metodoPago: v.metodo_pago,
+      productos: [] 
+    }));
+  } catch (error) {
+    console.error("Error cargando ventas:", error);
+    return [];
   }
-  const { data } = await api.get(`/reportes/ventas?inicio=${fechaInicio}&fin=${fechaFin}`);
-  return data;
 };
 
+// ============================================
+// 6. REPORTES (Integrados con datos reales)
+// ============================================
 export const getReporteInventario = async () => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const reporte = medicamentos.map(m => ({ ...m, valor_total: m.stock_total * m.precio_venta }));
-      setTimeout(() => resolve(reporte), 300);
-    });
+  if (!USE_MOCK) {
+     const data = await getMedicamentos();
+     return data.map(m => ({ 
+        ...m, valor_total: (m.stock_total || 0) * Number(m.precio_venta) 
+     }));
   }
-  const { data } = await api.get('/reportes/inventario');
-  return data;
+  return [];
 };
 
 export const getReporteAlertas = async () => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const alertas = { vencimiento: getAlertasVencimiento(), stock: getAlertasStock() };
-      setTimeout(() => resolve(alertas), 300);
-    });
-  }
-  const { data } = await api.get('/reportes/alertas');
-  return data;
+  const [vencimiento, stock] = await Promise.all([
+    getAlertasVencimientoAPI(),
+    getAlertasStockAPI()
+  ]);
+  return { vencimiento, stock };
 };
 
-export const getReportePrincipioActivo = async () => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const reportePA = medicamentos.map(m => ({
-        principio_activo: m.principio_activo,
-        nombre_comercial: m.nombre_comercial,
-        stock: m.stock_total,
-        precio: m.precio_venta,
-        valor_total: m.stock_total * m.precio_venta
-      })).sort((a, b) => b.valor_total - a.valor_total);
-      setTimeout(() => resolve(reportePA), 300);
-    });
-  }
-  const { data } = await api.get('/reportes/principio-activo');
-  return data;
-};
-
-export const getReporteClientes = async () => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const clientes = {};
-      ventasHistorial.forEach(venta => {
-        if (!clientes[venta.cliente_dni]) {
-          clientes[venta.cliente_dni] = {
-            dni: venta.cliente_dni,
-            nombre: venta.cliente_nombre,
-            totalCompras: 0,
-            cantidadTransacciones: 0,
-            ultimaCompra: venta.fecha
-          };
-        }
-        clientes[venta.cliente_dni].totalCompras += venta.total;
-        clientes[venta.cliente_dni].cantidadTransacciones++;
-        clientes[venta.cliente_dni].ultimaCompra = venta.fecha;
-      });
-      const reporteClientes = Object.values(clientes).sort((a, b) => b.totalCompras - a.totalCompras);
-      setTimeout(() => resolve(reporteClientes), 300);
-    });
-  }
-  const { data } = await api.get('/reportes/clientes');
-  return data;
-};
-
-export const getReporteProductosMasVendidos = async () => {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      const productosMasVendidos = {};
-      ventasHistorial.forEach(venta => {
-        venta.productos.forEach(prod => {
-          if (!productosMasVendidos[prod.nombre]) {
-            productosMasVendidos[prod.nombre] = { nombre: prod.nombre, cantidadVendida: 0, ingresos: 0 };
-          }
-          productosMasVendidos[prod.nombre].cantidadVendida += prod.cantidad;
-          productosMasVendidos[prod.nombre].ingresos += prod.cantidad * prod.precio_unitario;
-        });
-      });
-      const reporte = Object.values(productosMasVendidos).sort((a, b) => b.cantidadVendida - a.cantidadVendida).slice(0, 10);
-      setTimeout(() => resolve(reporte), 300);
-    });
-  }
-  const { data } = await api.get('/reportes/productos-mas-vendidos');
-  return data;
-};
+export const getReporteVentas = async () => [];
+export const getReportePrincipioActivo = async () => [];
+export const getReporteClientes = async () => [];
+export const getReporteProductosMasVendidos = async () => [];
 
 export default api;

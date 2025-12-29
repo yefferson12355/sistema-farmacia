@@ -1,497 +1,270 @@
 import React, { useState, useEffect } from 'react';
-import {
-  FiTrendingUp,
-  FiDollarSign,
-  FiUsers,
-  FiRefreshCw,
-  FiBarChart2,
-  FiShoppingCart,
-  FiPackage,
-} from 'react-icons/fi';
 import Sidebar from '../../components/Sidebar';
 import { 
-  PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  AreaChart, Area
+  getMedicamentos, 
+  getAlertasVencimientoAPI, 
+  getAlertasStockAPI 
+} from '../../services/api';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell, Legend, AreaChart, Area 
 } from 'recharts';
+import { 
+  FiDollarSign, 
+  FiShoppingBag, 
+  FiActivity, 
+  FiBox,
+  FiTrendingUp,
+  FiCalendar
+} from 'react-icons/fi';
 
-/**
- * KPIs
- * Dashboard avanzado con indicadores clave de rendimiento
- */
-function KPIs() {
-  const [periodo, setPeriodo] = useState('mes');
+const KPIs = () => {
   const [loading, setLoading] = useState(true);
+  
+  // Estado para los indicadores
+  const [indicadores, setIndicadores] = useState({
+    valorInventario: 0,
+    totalProductos: 0,
+    productosVencidos: 0,
+    productosPorVencer: 0,
+    productosVigentes: 0,
+    stockBajo: 0
+  });
 
-  // Mock KPIs Data
-  const kpisData = {
-    ventasHoy: 2450.00,
-    ventasMes: 45780.50,
-    transaccionesHoy: 28,
-    transaccionesMes: 485,
-    ticketPromedio: 94.39,
-    clientesNuevos: 12,
-    productosVendidos: 1250,
-    margenPromedio: 32.5,
-    crecimientoVentas: 15.3,
-    rotacionInventario: 4.2,
-  };
-
-  // Datos para gráfico de ventas por día
-  const ventasPorDia = [
-    { dia: 'Lun', ventas: 1850, transacciones: 22 },
-    { dia: 'Mar', ventas: 2100, transacciones: 25 },
-    { dia: 'Mié', ventas: 1950, transacciones: 24 },
-    { dia: 'Jue', ventas: 2300, transacciones: 28 },
-    { dia: 'Vie', ventas: 2800, transacciones: 35 },
-    { dia: 'Sáb', ventas: 3200, transacciones: 42 },
-    { dia: 'Dom', ventas: 1500, transacciones: 18 },
-  ];
-
-  // Datos para gráfico de categorías
-  const ventasPorCategoria = [
-    { categoria: 'Analgésicos', valor: 12500, color: '#3b82f6' },
-    { categoria: 'Antibióticos', valor: 9800, color: '#22c55e' },
-    { categoria: 'Vitaminas', valor: 7500, color: '#f59e0b' },
-    { categoria: 'Antihipertensivos', valor: 6200, color: '#ef4444' },
-    { categoria: 'Otros', valor: 9780.50, color: '#8b5cf6' },
-  ];
-
-  // Datos para gráfico de tendencia mensual
-  const tendenciaMensual = [
-    { mes: 'Ago', ventas: 38500 },
-    { mes: 'Sep', ventas: 41200 },
-    { mes: 'Oct', ventas: 39800 },
-    { mes: 'Nov', ventas: 43500 },
-    { mes: 'Dic', ventas: 48200 },
-    { mes: 'Ene', ventas: 45780 },
-  ];
-
-  // Datos del semáforo de inventario
-  const semaforoData = [
-    { name: 'Vencidos', value: 18, color: '#ef4444' },
-    { name: 'Por Vencer', value: 45, color: '#eab308' },
-    { name: 'Vigentes', value: 1322, color: '#22c55e' },
+  // Datos para los gráficos
+  const [datosSemaforo, setDatosSemaforo] = useState([]);
+  
+  // Datos estáticos para ventas (hasta que el backend tenga el endpoint de historial)
+  const datosVentasSemana = [
+    { name: 'Lun', ventas: 1200 }, { name: 'Mar', ventas: 2100 },
+    { name: 'Mié', ventas: 800 }, { name: 'Jue', ventas: 1600 },
+    { name: 'Vie', ventas: 2300 }, { name: 'Sáb', ventas: 3400 },
+    { name: 'Dom', ventas: 1500 },
   ];
 
   useEffect(() => {
-    setTimeout(() => setLoading(false), 500);
+    cargarDatosReales();
   }, []);
 
-  const formatCurrency = (value) => `S/ ${value.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`;
+  const cargarDatosReales = async () => {
+    try {
+      // 1. Peticiones en paralelo al servidor real
+      const [medicamentos, alertasVenc, alertasStock] = await Promise.all([
+        getMedicamentos(),
+        getAlertasVencimientoAPI(),
+        getAlertasStockAPI()
+      ]);
+
+      // 2. Cálculos Reales
+      const totalItems = medicamentos.length;
+      
+      // Calcular valor monetario del inventario (Stock * Precio Venta)
+      const valorTotal = medicamentos.reduce((acc, item) => {
+        const stock = Number(item.stock_total || item.stock_actual || 0);
+        const precio = Number(item.precio_venta || 0);
+        return acc + (stock * precio);
+      }, 0);
+
+      const numVencidos = alertasVenc.filter(a => a.estado === 'vencido').length;
+      const numPorVencer = alertasVenc.filter(a => a.estado === 'por_vencer').length;
+      // Los vigentes son el total menos los que tienen problemas
+      const numVigentes = Math.max(0, totalItems - (numVencidos + numPorVencer));
+
+      // 3. Actualizar estado
+      setIndicadores({
+        valorInventario: valorTotal,
+        totalProductos: totalItems,
+        productosVencidos: numVencidos,
+        productosPorVencer: numPorVencer,
+        productosVigentes: numVigentes,
+        stockBajo: alertasStock.length
+      });
+
+      setDatosSemaforo([
+        { name: 'Vencidos', value: numVencidos, color: '#ef4444' },     // Rojo
+        { name: 'Por Vencer', value: numPorVencer, color: '#eab308' },  // Amarillo
+        { name: 'Vigentes', value: numVigentes, color: '#22c55e' },     // Verde
+      ]);
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error cargando KPIs:", error);
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (val) => `S/ ${val.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`;
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+        <p style={{ color: '#64748b', fontSize: '18px' }}>Cargando indicadores en tiempo real...</p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f5f5f5' }}>
-      {/* SIDEBAR */}
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f8fafc' }}>
       <Sidebar />
-
-      {/* MAIN CONTENT */}
-      <main style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
-        {/* Header */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '24px' 
-        }}>
+      
+      <main style={{ flex: 1, padding: '30px', overflowY: 'auto' }}>
+        {/* Encabezado */}
+        <div style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '28px', color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <FiBarChart2 style={{ color: '#8b5cf6' }} />
-              Dashboard de KPIs
+            <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#1e293b', marginBottom: '4px' }}>
+              Dashboard Financiero y Operativo
             </h1>
-            <p style={{ margin: '4px 0 0', color: '#666' }}>
-              Indicadores clave de rendimiento del negocio
+            <p style={{ color: '#64748b', fontSize: '14px' }}>
+              Vista general del rendimiento de la farmacia basado en datos actuales.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <select
-              value={periodo}
-              onChange={(e) => setPeriodo(e.target.value)}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #ddd',
-                borderRadius: '8px',
-                fontSize: '14px',
-                backgroundColor: 'white'
-              }}
-            >
-              <option value="semana">Esta Semana</option>
-              <option value="mes">Este Mes</option>
-              <option value="trimestre">Trimestre</option>
-              <option value="año">Este Año</option>
-            </select>
-            <button
-              onClick={() => setLoading(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 20px',
-                backgroundColor: '#8b5cf6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              <FiRefreshCw />
-              Actualizar
-            </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <span style={{ padding: '8px 16px', background: 'white', borderRadius: '20px', fontSize: '13px', color: '#64748b', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FiCalendar /> {new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </span>
           </div>
         </div>
 
-        {loading ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: '#666' }}>
-            Cargando KPIs...
+        {/* Fila 1: Tarjetas Principales (Diseño Mejorado) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px', marginBottom: '30px' }}>
+          
+          {/* Card: Valor Inventario */}
+          <div style={{ background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'relative', zIndex: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={{ padding: '12px', background: '#ecfdf5', borderRadius: '12px', color: '#10b981' }}>
+                  <FiDollarSign size={24} />
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: '#10b981', background: '#ecfdf5', padding: '4px 10px', borderRadius: '20px', height: 'fit-content' }}>
+                  +Activo
+                </span>
+              </div>
+              <h3 style={{ fontSize: '32px', fontWeight: '800', color: '#1e293b', margin: '0 0 4px 0' }}>
+                {formatCurrency(indicadores.valorInventario)}
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>Valor Total del Inventario</p>
+            </div>
           </div>
-        ) : (
-          <>
-            {/* KPIs Cards Row 1 */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
-              gap: '16px',
-              marginBottom: '24px'
-            }}>
-              <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                borderLeft: '4px solid #22c55e'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>Ventas Hoy</p>
-                    <p style={{ margin: '8px 0 0', fontSize: '28px', fontWeight: 'bold', color: '#22c55e' }}>
-                      {formatCurrency(kpisData.ventasHoy)}
-                    </p>
-                  </div>
-                  <div style={{ padding: '10px', backgroundColor: '#dcfce7', borderRadius: '8px' }}>
-                    <FiDollarSign style={{ color: '#22c55e', fontSize: '20px' }} />
-                  </div>
-                </div>
-                <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <FiTrendingUp /> +12% vs ayer
-                </p>
-              </div>
 
-              <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                borderLeft: '4px solid #3b82f6'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>Ventas del Mes</p>
-                    <p style={{ margin: '8px 0 0', fontSize: '28px', fontWeight: 'bold', color: '#3b82f6' }}>
-                      {formatCurrency(kpisData.ventasMes)}
-                    </p>
-                  </div>
-                  <div style={{ padding: '10px', backgroundColor: '#dbeafe', borderRadius: '8px' }}>
-                    <FiBarChart2 style={{ color: '#3b82f6', fontSize: '20px' }} />
-                  </div>
-                </div>
-                <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <FiTrendingUp /> +{kpisData.crecimientoVentas}% vs mes anterior
-                </p>
+          {/* Card: Total Productos */}
+          <div style={{ background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ padding: '12px', background: '#eff6ff', borderRadius: '12px', color: '#3b82f6' }}>
+                <FiBox size={24} />
               </div>
+            </div>
+            <h3 style={{ fontSize: '32px', fontWeight: '800', color: '#1e293b', margin: '0 0 4px 0' }}>
+              {indicadores.totalProductos}
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>Productos Registrados</p>
+          </div>
 
-              <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                borderLeft: '4px solid #f59e0b'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>Ticket Promedio</p>
-                    <p style={{ margin: '8px 0 0', fontSize: '28px', fontWeight: 'bold', color: '#f59e0b' }}>
-                      {formatCurrency(kpisData.ticketPromedio)}
-                    </p>
-                  </div>
-                  <div style={{ padding: '10px', backgroundColor: '#fef3c7', borderRadius: '8px' }}>
-                    <FiShoppingCart style={{ color: '#f59e0b', fontSize: '20px' }} />
-                  </div>
-                </div>
-                <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#666' }}>
-                  {kpisData.transaccionesMes} transacciones
-                </p>
+          {/* Card: Stock Crítico */}
+          <div style={{ background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ padding: '12px', background: '#fff7ed', borderRadius: '12px', color: '#f97316' }}>
+                <FiActivity size={24} />
               </div>
+              {indicadores.stockBajo > 0 && (
+                <span style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', background: '#fff7ed', padding: '4px 10px', borderRadius: '20px', height: 'fit-content' }}>
+                  Requiere Atención
+                </span>
+              )}
+            </div>
+            <h3 style={{ fontSize: '32px', fontWeight: '800', color: '#1e293b', margin: '0 0 4px 0' }}>
+              {indicadores.stockBajo}
+            </h3>
+            <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>Productos con Stock Bajo</p>
+          </div>
+        </div>
 
-              <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                borderLeft: '4px solid #8b5cf6'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>Margen Promedio</p>
-                    <p style={{ margin: '8px 0 0', fontSize: '28px', fontWeight: 'bold', color: '#8b5cf6' }}>
-                      {kpisData.margenPromedio}%
-                    </p>
-                  </div>
-                  <div style={{ padding: '10px', backgroundColor: '#f3e8ff', borderRadius: '8px' }}>
-                    <FiTrendingUp style={{ color: '#8b5cf6', fontSize: '20px' }} />
-                  </div>
-                </div>
-                <p style={{ margin: '12px 0 0', fontSize: '12px', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <FiTrendingUp /> +2.3% vs mes anterior
-                </p>
+        {/* Fila 2: Gráficos y Detalles */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+          
+          {/* Gráfico de Ventas (Simulado por ahora) */}
+          <div style={{ background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1e293b', marginBottom: '24px' }}>Proyección de Ventas (Semana)</h3>
+            <div style={{ height: '300px', width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={datosVentasSemana}>
+                  <defs>
+                    <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                    formatter={(value) => [`S/ ${value}`, 'Venta']}
+                  />
+                  <Area type="monotone" dataKey="ventas" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorVentas)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Estado del Inventario (Real) */}
+          <div style={{ background: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1e293b', marginBottom: '24px' }}>Salud del Inventario</h3>
+            <div style={{ height: '220px', position: 'relative' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={datosSemaforo}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {datosSemaforo.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              {/* Texto Central */}
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                <p style={{ fontSize: '24px', fontWeight: '800', color: '#1e293b', margin: 0 }}>{indicadores.totalProductos}</p>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Lotes</p>
               </div>
             </div>
 
-            {/* Charts Row */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', 
-              gap: '24px',
-              marginBottom: '24px'
-            }}>
-              {/* Ventas por Día */}
-              <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-              }}>
-                <h3 style={{ margin: '0 0 16px', color: '#374151', fontSize: '16px' }}>
-                  Ventas por Día de la Semana
-                </h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={ventasPorDia}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="dia" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `S/${v/1000}k`} />
-                    <Tooltip 
-                      formatter={(value) => [`S/ ${value.toLocaleString()}`, 'Ventas']}
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #eee' }}
-                    />
-                    <Bar dataKey="ventas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+            {/* Leyenda Personalizada */}
+            <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></div>
+                  <span style={{ fontSize: '13px', color: '#475569' }}>Vigentes</span>
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>{indicadores.productosVigentes}</span>
               </div>
-
-              {/* Tendencia Mensual */}
-              <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-              }}>
-                <h3 style={{ margin: '0 0 16px', color: '#374151', fontSize: '16px' }}>
-                  Tendencia de Ventas (Últimos 6 meses)
-                </h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <AreaChart data={tendenciaMensual}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `S/${v/1000}k`} />
-                    <Tooltip 
-                      formatter={(value) => [`S/ ${value.toLocaleString()}`, 'Ventas']}
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #eee' }}
-                    />
-                    <Area type="monotone" dataKey="ventas" stroke="#22c55e" fill="#dcfce7" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308' }}></div>
+                  <span style={{ fontSize: '13px', color: '#475569' }}>Por Vencer</span>
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>{indicadores.productosPorVencer}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }}></div>
+                  <span style={{ fontSize: '13px', color: '#475569' }}>Vencidos</span>
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>{indicadores.productosVencidos}</span>
               </div>
             </div>
+          </div>
 
-            {/* Bottom Row */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-              gap: '24px'
-            }}>
-              {/* Ventas por Categoría */}
-              <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-              }}>
-                <h3 style={{ margin: '0 0 16px', color: '#374151', fontSize: '16px' }}>
-                  Ventas por Categoría
-                </h3>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={ventasPorCategoria}
-                      dataKey="valor"
-                      nameKey="categoria"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={({ categoria, percent }) => `${categoria} ${(percent * 100).toFixed(0)}%`}
-                      labelLine={false}
-                    >
-                      {ventasPorCategoria.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value) => [`S/ ${value.toLocaleString()}`, 'Ventas']}
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #eee' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Semáforo de Inventario */}
-              <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-              }}>
-                <h3 style={{ margin: '0 0 16px', color: '#374151', fontSize: '16px' }}>
-                  Estado del Inventario (Semáforo)
-                </h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={semaforoData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                    >
-                      {semaforoData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Legend />
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-around', 
-                  marginTop: '16px',
-                  padding: '12px',
-                  backgroundColor: '#f9fafb',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{ 
-                      display: 'inline-block',
-                      width: '12px',
-                      height: '12px',
-                      backgroundColor: '#ef4444',
-                      borderRadius: '50%',
-                      marginRight: '6px'
-                    }}></span>
-                    <span style={{ fontSize: '12px', color: '#666' }}>Vencidos: {semaforoData[0].value}</span>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{ 
-                      display: 'inline-block',
-                      width: '12px',
-                      height: '12px',
-                      backgroundColor: '#eab308',
-                      borderRadius: '50%',
-                      marginRight: '6px'
-                    }}></span>
-                    <span style={{ fontSize: '12px', color: '#666' }}>Por Vencer: {semaforoData[1].value}</span>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <span style={{ 
-                      display: 'inline-block',
-                      width: '12px',
-                      height: '12px',
-                      backgroundColor: '#22c55e',
-                      borderRadius: '50%',
-                      marginRight: '6px'
-                    }}></span>
-                    <span style={{ fontSize: '12px', color: '#666' }}>Vigentes: {semaforoData[2].value}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* KPIs Adicionales */}
-              <div style={{
-                backgroundColor: 'white',
-                padding: '20px',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-              }}>
-                <h3 style={{ margin: '0 0 16px', color: '#374151', fontSize: '16px' }}>
-                  Indicadores Adicionales
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '12px',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '8px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <FiUsers style={{ color: '#3b82f6', fontSize: '20px' }} />
-                      <span style={{ color: '#666' }}>Clientes Nuevos (mes)</span>
-                    </div>
-                    <span style={{ fontWeight: 'bold', color: '#3b82f6' }}>{kpisData.clientesNuevos}</span>
-                  </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '12px',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '8px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <FiPackage style={{ color: '#22c55e', fontSize: '20px' }} />
-                      <span style={{ color: '#666' }}>Productos Vendidos</span>
-                    </div>
-                    <span style={{ fontWeight: 'bold', color: '#22c55e' }}>{kpisData.productosVendidos.toLocaleString()}</span>
-                  </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '12px',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '8px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <FiRefreshCw style={{ color: '#f59e0b', fontSize: '20px' }} />
-                      <span style={{ color: '#666' }}>Rotación Inventario</span>
-                    </div>
-                    <span style={{ fontWeight: 'bold', color: '#f59e0b' }}>{kpisData.rotacionInventario}x</span>
-                  </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '12px',
-                    backgroundColor: '#f9fafb',
-                    borderRadius: '8px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <FiShoppingCart style={{ color: '#8b5cf6', fontSize: '20px' }} />
-                      <span style={{ color: '#666' }}>Transacciones Hoy</span>
-                    </div>
-                    <span style={{ fontWeight: 'bold', color: '#8b5cf6' }}>{kpisData.transaccionesHoy}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        </div>
       </main>
     </div>
   );
-}
+};
 
 export default KPIs;

@@ -14,8 +14,7 @@
 # misc
 
 .DS_Store
-.env
-.env.*
+
 *.txt
 *.tar
 .env.local
