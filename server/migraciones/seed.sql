@@ -107,3 +107,13 @@ VALUES
 (10,10,1, 25.00, 25.00);
 
 COMMIT;
+
+-- 🛠️ ARREGLAR SECUENCIAS (IMPORTANTE PARA EVITAR ERROR DE ID DUPLICADO)
+-- Esto le dice a la BD que el próximo ID debe ser el máximo existente + 1
+SELECT setval('usuarios_id_seq', (SELECT MAX(id) FROM usuarios));
+SELECT setval('medicamentos_id_seq', (SELECT MAX(id) FROM medicamentos));
+SELECT setval('lotes_id_seq', (SELECT MAX(id) FROM lotes));
+SELECT setval('ventas_id_seq', (SELECT MAX(id) FROM ventas));
+SELECT setval('venta_detalle_id_seq', (SELECT MAX(id) FROM venta_detalle));
+SELECT setval('alertas_id_seq', (SELECT MAX(id) FROM alertas));
+-- Fin de arreglo de secuencias
